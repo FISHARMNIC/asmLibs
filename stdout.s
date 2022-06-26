@@ -2,7 +2,7 @@
 
 VGA_ADDR = 0xB8000 # address of VGA in RAM
 BG_COLOR = 0
-FG_COLOR = 0
+FG_COLOR = 15
 .section .data
 
 ttypos: .long VGA_ADDR # current tty position
