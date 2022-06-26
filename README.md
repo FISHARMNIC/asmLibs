@@ -25,3 +25,13 @@ libraries meant for 32-bit freestanding gnu-assembly
   * Does not display on screen
 ### `geti <r32 or integer>`
   * Same as `gets` but with numbers
+
+# Stdout
+---
+## --Defined--
+#### `VGA_ADDR`
+  * VGA address in RAM
+
+## --Variables--
+#### `<long> ttypos`
+todo rest
