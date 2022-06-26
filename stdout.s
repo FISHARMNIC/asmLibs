@@ -31,20 +31,59 @@ format_VGA_proc:
 // Adding a new line
 newline_proc:
     // newline = position  + (80 - (position % 80))
-    push %eax; push %ebx; push %edx
-   
-    addw ttypos, 160
-    mov %eax, [ttypos] - VGA_ADDR
-    mov %ebx, 160
-    div %ebx
-    sub ttypos, %edx
+    # NEWLINE = position  + (80 - (position % 80))
+    pusha
 
-    pop %edx; pop %ebx; pop %eax
+    xor %edx, %edx 
+
+    mov %ecx, ttypos
+    sub %ecx, VGA_ADDR 
+    shr %ecx, 1 # ecx holds relative tty
+
+    mov %eax, %ecx
+    mov %ebx, 80 # divisor
+    div %ebx # remainder (mod) in %edx
+
+    sub %ebx, %edx # 80 - remainder
+    add %ebx, %ecx # edx = linePos
+    shl %ebx, 1 # reajust for 2-width
+    mov ttypos, %ebx # new line position
+    
+    mov %ebx, VGA_ADDR
+    add ttypos, %ebx
+    popa
     ret
+
+clear_line_proc:
+    push %eax
+    mov %eax, VGA_ADDR
+    _clp_ls:
+        movw [%eax], 0
+        inc %eax
+        cmp %eax, 0xB8019
+        jl _clp_ls
+    
+    mov %eax, VGA_ADDR
+    mov ttypos, %eax
+    pop %eax
+    ret
+
+.macro clear_line
+    call clear_line_proc
+.endm
 
 .macro put_line
     call newline_proc
 .endm
+
+.macro tty_inc
+    addw ttypos, 2
+.endm
+
+.macro tty_dec
+    subw ttypos, 2
+.endm
+
 /* #endregion */
 
 /* #region Character Out */

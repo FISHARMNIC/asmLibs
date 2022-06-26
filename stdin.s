@@ -83,12 +83,12 @@ KEY_UP = 0x48
 /* #endregion */
 
 .section .data
-char_map: .asciz " `1234567890-=  qwertyuiop[]\  asdfghjkl;'   zxcvbnm,./      "
+char_map: .asciz "`^1234567890-=  qwertyuiop[]\  asdfghjkl;' ) zxcvbnm,./______"
 keyboard_out: .byte 0
 keyboard_redge: .byte 0
 .section .text
 
-/* #region Keyboard Input */
+/* #region Raw Input */
 // Read directly from the keyboard
 read_keyboard_proc:
     /* 
@@ -108,7 +108,6 @@ k2char_proc:
     /*
     Clobbers:
         EAX = keycode
-        EBX
     */
     push %ebx
     lea %ebx, char_map
@@ -117,28 +116,26 @@ k2char_proc:
     pop %ebx
     ret
 
-.macro c2key key
+// Macros
+.macro k2char_al 
+    call k2char_proc
+.endm
+.macro k2char key
     xor %eax, %eax
     mov %al, \key
-    call c2key_proc
+    call k2char_proc
 .endm
-
 .macro read_keyboard
     call read_keyboard_proc
 .endm
 /* #endregion */
 
 /* #region Keyform Detection */
+// Check key input types
 key_redge_proc:
-    cmpb keyboard_out, 0 # below -128 - 0 is falling edge
-    //push %eax
-    // lahf # load status flags into ah
-    // shr %ah, 6 # six'th bith
-    // and %ah, 1
-    // mov keyboard_redge, %al
-    //pop %eax
-    jg _ke_fedge
     movb keyboard_redge, 0
+    cmpb keyboard_out, 0 # below -128 - 0 is falling edge
+    jg _ke_fedge
     ret
     _ke_fedge:
     movb keyboard_redge, 1
@@ -149,4 +146,89 @@ key_redge_proc:
 .endm
 /* #endregion */
 
+/* #region Stdin Functions */
+    // Await a single keypress
+    getc_proc:
+        /* 
+        Return: AL
+        */
+        read_keyboard
+        cmpb keyboard_out, 0 # Read and compare keyboard
+        jle getc_proc # falling edge or no key pressed (-128 -> 0)
+        _ic_fe:
+        # Awaiting keyboard release
+        read_keyboard
+        cmpb keyboard_out, 0 
+        jge _ic_fe # (0-128) means the key is still being held
+        sub %al, 128
+        subb keyboard_out, 128
+        ret
+
+    gets_proc:
+        /*
+        Clobbers:
+            EBX = string address
+        */
+        push %eax
+        _gets_entry:
+            call getc_proc
+            k2char_al
+            put_char_al
+            mov [%ebx], %al # move into pointer
+            inc %ebx
+            cmpb keyboard_out, KEY_ENTER
+            jne _gets_entry
+        dec %ebx
+        movb [%ebx], 0
+        pop %eax
+        ret
+
+    geti_proc:
+        /* 
+        Clobbers:
+            EBX = Stores number
+        */
+        push %ecx
+        xor %ebx, %ebx # stores number
+        xor %ecx, %ecx # incase overflow
+        call getc_proc
+        dec %al # convert to number
+        mov %bl, %al
+        _gi_loop:
+            call getc_proc
+            cmp %al, KEY_ENTER
+            je _gi_exit # exit on key enter
+            dec %al
+            mov %cl, %al # store entered
+            mov %eax, 10
+            mul %ebx # saved number
+            add %eax, %ecx # shift and add
+            mov %ebx, %eax
+            jmp _gi_loop
+        _gi_exit:
+        pop %ecx
+        ret
+// Macros
+.macro getc
+    call getc_proc
+.endm
+
+.macro gets lbl
+    lea %ebx, \lbl
+    call gets_proc
+.endm
+
+.macro gets_safe lbl
+    push %ebx
+    gets \lbl
+    pop %ebx
+.endm
+
+.macro geti num
+    push %ebx
+    call geti_proc
+    mov \num, %ebx
+    pop %ebx
+.endm
+/* #endregion */
 .att_syntax
